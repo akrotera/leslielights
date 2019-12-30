@@ -17,6 +17,11 @@ CRGB leds[NUM_LEDS];
 
 uint8_t underglow_status = 0;
 uint8_t animation = 0;
+uint16_t animate_speed = 100;
+uint16_t frame = 0;
+
+uint8_t mediumBright = 42;
+uint8_t highBright = 142;
 
 class UnderglowCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic)
@@ -53,9 +58,43 @@ class UnderglowCallbacks: public BLECharacteristicCallbacks {
           Serial.println("Underglow anim 2");
           animation = 2;
         }
-
+        if (value == "3") {
+          Serial.println("Underglow anim 3");
+          animation = 3;
+        }
+        if (value == "4") {
+          Serial.println("Underglow anim 4");
+          animation = 4;
+        }
+        if (value == "5") {
+          Serial.println("Underglow anim 5");
+          animation = 5;
+        }
+        if (value == "6") {
+          Serial.println("Underglow anim 6");
+          animation = 6;
+        }
+        if (value == "7") {
+          Serial.println("Underglow anim 7");
+          animation = 7;
+        }
+        if (value == "8") {
+          Serial.println("Underglow anim 8");
+          animation = 8;
+        }
+        if (value == "9") {
+          Serial.println("Underglow anim 9");
+          animation = 9;
+        }
+        if (value == "10") {
+          Serial.println("Underglow anim 10");
+          animation = 10;
+        }
+        if (value == "11") {
+          Serial.println("Underglow anim 11");
+          animation = 11;
+        }
       }
-
     }
 };
 
@@ -127,10 +166,56 @@ void loop() {
     switch (animation) {
       case 0:
         Serial.println("0 - Demo");
-        ida();
+        rainbow(frame, 169);
+        FastLED.show();
+        frame += animateSpeed;
         break;
       case 1:
-        Serial.println("1 - Fijo");
+        Serial.println("1 - Static medium");
+        turnMedium();
+        break;
+      case 2:
+        Serial.println("2 - Static high");
+        turnHigh();
+        break;
+      case 3:
+        Serial.println("3 - Breathing");
+        ida();
+        break;
+      case 4:
+        Serial.println("4 - Chase");
+        poneMedio();
+        break;
+      case 5:
+        Serial.println("5 - Random fill");
+        ida();
+        break;
+      case 6:
+        Serial.println("6 - Strobe");
+        poneMedio();
+        break;
+      case 7:
+        Serial.println("7 - Alternate strobe");
+        ida();
+        break;
+      case 8:
+        Serial.println("8 - Chase over");
+        poneMedio();
+        break;
+      case 9:
+        Serial.println("9 - Chase over 2");
+        ida();
+        break;
+      case 10:
+        Serial.println("10 - Random spark over");
+        poneMedio();
+        break;
+      case 11:
+        Serial.println("11 - Random spark");
+        ida();
+        break;
+      case 12:
+        Serial.println("12 - Random spark 2");
         poneMedio();
         break;
     }
@@ -138,19 +223,56 @@ void loop() {
   delay(1000);
 }
 
-void poneMedio() {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 42, 0);
+void rainbow(uint16_t animationFrame, uint8_t fade) {
+  uint16_t rand = random16();
+
+  for (uint8_t i = 0; i < NUM_LEDS; i++) {
+    leds[i].nscale8(fade);
   }
+  uint8_t hue = animationFrame / 255;
+  leds[rand % NUM_LEDS].setHSV(hue, 255, 255);
+}
+
+void turnMedium() {
+  lightAllMedium();
+}
+
+void turnHigh() {
+  lightAllHigh();
+}
+
+
+
+
+
+
+
+void lightAllMedium() {
+  fill_solid(leds, NUM_LEDS, CRGB(0, mediumBright, 0));
+}
+
+void lightAllHigh() {
+  fill_solid(leds, NUM_LEDS, CRGB(0, highBrigh, 0));
+}
+
+void turnOffAll() {
+  FastLED.clear();
   FastLED.show();
 }
 
-void ida() {
-  poneMedio();
-  for (int i = 0; i < NUM_LEDS; i++) {
-    poneMedio();
-    leds[i] = CRGB(0, 100, 0);
-    FastLED.show();
-    delay(42);
-  }
+void lightMedium(uint8_t pos) {
+  leds[pos] = CRGB(0, mediumBright, 0);
+  FastLED.show();
+}
+
+void lightHigh(uint8_t pos) {
+  leds[pos] = CRGB(0, highBrigh, 0);
+  FastLED.show();
+}
+
+void turnOff(uint8_t pos) {
+  leds[pos] = CRGB(0, 0, 0);
+  FastLED.show();
+}
+
 }
