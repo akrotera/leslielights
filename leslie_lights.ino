@@ -1,20 +1,21 @@
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
+#include <SoftwareSerial.h>
 #include <FastLED.h>
 
-#define UNDERGLOW_SERVICE_UUID      "8a32ae00-62dc-4672-aaf0-48a47099af60"
-#define UNDERGLOW_CHARC_STATUS_UUID "8a32ae01-62dc-4672-aaf0-48a47099af60"
-#define UNDERGLOW_CHARC_MODE_UUID   "8a32ae02-62dc-4672-aaf0-48a47099af60"
-#define AMBIENT_SERVICE_UUID        "8a32ae10-62dc-4672-aaf0-48a47099af60"
-#define AMBIENT_CHARC_STATUS_UUID   "8a32ae11-62dc-4672-aaf0-48a47099af60"
+const char UNDERGLOW_OFF = '0';
+const char UNDERGLOW_ON = '1';
+const char AMBIENT_OFF = '2';
+const char AMBIENT_ON = '3';
+const char STROBE_OFF = '4';
+const char STROBE_ON = '5';
 
-#define UNDERGLOW_DATA_PIN 22
+#define UNDERGLOW_DATA_PIN 5
 #define NUM_LEDS 150
-#define AMBIENT_LED_PIN 23
+#define AMBIENT_LED_PIN 6
+#define STROBE_LED_PIN 7
 
 #define MAX_INT_VALUE 65536
 
+SoftwareSerial ble(3, 4);
 CRGB leds[NUM_LEDS];
 
 uint8_t underglow_status = 0;
@@ -25,211 +26,129 @@ uint16_t frame = 0;
 uint8_t mediumBright = 42;
 uint8_t highBright = 242;
 
-class UnderglowCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic)
-    {
-      std::string uuid = pCharacteristic->getUUID().toString();
-      std::string value = pCharacteristic->getValue();
-
-      if (uuid == UNDERGLOW_CHARC_STATUS_UUID) {
-        if (value == "1") {
-          Serial.println("Turning ON the underglow");
-          digitalWrite(UNDERGLOW_DATA_PIN, HIGH);
-          underglow_status = 1;
-        }
-
-        if (value == "0") {
-          Serial.println("Turning OFF the underglow");
-          FastLED.clear();
-          FastLED.show();
-          digitalWrite(UNDERGLOW_DATA_PIN, LOW);
-          underglow_status = 0;
-        }
-      }
-
-      if (uuid == UNDERGLOW_CHARC_MODE_UUID) {
-        //Possible chabge to enum?
-        if (value == "0") {
-          Serial.println("Underglow anim default");
-          animation = 0;
-        }
-        if (value == "1") {
-          Serial.println("Underglow anim 1");
-          animation = 1;
-        }
-        if (value == "2") {
-          Serial.println("Underglow anim 2");
-          animation = 2;
-        }
-        if (value == "3") {
-          Serial.println("Underglow anim 3");
-          animation = 3;
-        }
-        if (value == "4") {
-          Serial.println("Underglow anim 4");
-          animation = 4;
-        }
-        if (value == "5") {
-          Serial.println("Underglow anim 5");
-          animation = 5;
-        }
-        if (value == "6") {
-          Serial.println("Underglow anim 6");
-          animation = 6;
-        }
-        if (value == "7") {
-          Serial.println("Underglow anim 7");
-          animation = 7;
-        }
-        if (value == "8") {
-          Serial.println("Underglow anim 8");
-          animation = 8;
-        }
-        if (value == "9") {
-          Serial.println("Underglow anim 9");
-          animation = 9;
-        }
-        if (value == "10") {
-          Serial.println("Underglow anim 10");
-          animation = 10;
-        }
-        if (value == "11") {
-          Serial.println("Underglow anim 11");
-          animation = 11;
-        }
-        if (value == "12") {
-          Serial.println("Underglow anim 12");
-          animation = 12;
-        }
-      }
-    }
-};
-
-class AmbientCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
-      std::string value = pCharacteristic->getValue();
-
-      if (value == "1") {
-        Serial.println("Turning ON the ambient light");
-        digitalWrite(AMBIENT_LED_PIN, HIGH);
-      }
-
-      if (value == "0") {
-        Serial.println("Turning OFF the ambient light");
-        digitalWrite(AMBIENT_LED_PIN, LOW);
-      }
-    }
-};
-
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+  ble.begin(9600);
+
   pinMode(UNDERGLOW_DATA_PIN, OUTPUT);
   pinMode(AMBIENT_LED_PIN, OUTPUT);
-
-  BLEDevice::init("LeslieLights");
-  BLEServer *pServer = BLEDevice::createServer();
-
-  BLEService *pServiceUnderglow = pServer->createService(UNDERGLOW_SERVICE_UUID);
-
-  BLECharacteristic *pCharcUnderStatus = pServiceUnderglow->createCharacteristic(
-      UNDERGLOW_CHARC_STATUS_UUID,
-      BLECharacteristic::PROPERTY_READ |
-      BLECharacteristic::PROPERTY_WRITE);
-
-  BLECharacteristic *pCharcUnderMode = pServiceUnderglow->createCharacteristic(
-                                         UNDERGLOW_CHARC_MODE_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE);
-
-  pCharcUnderStatus->setCallbacks(new UnderglowCallbacks());
-  pCharcUnderMode->setCallbacks(new UnderglowCallbacks());
-
-  pCharcUnderStatus->setValue("0");
-  pCharcUnderMode->setValue("0");
-
-  pServiceUnderglow->start();
-
-  BLEService *pServiceAmbient = pServer->createService(AMBIENT_SERVICE_UUID);
-
-  BLECharacteristic *pCharcAmbientStatus = pServiceAmbient->createCharacteristic(
-        AMBIENT_CHARC_STATUS_UUID,
-        BLECharacteristic::PROPERTY_READ |
-        BLECharacteristic::PROPERTY_WRITE);
-
-  pCharcAmbientStatus->setCallbacks(new AmbientCallbacks());
-  pCharcAmbientStatus->setValue("0");
-
-  pServiceAmbient->start();
-
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  BLEDevice::startAdvertising();
+  digitalWrite(AMBIENT_LED_PIN, HIGH);
+  pinMode(STROBE_LED_PIN, OUTPUT);
 
   FastLED.addLeds<WS2812B, UNDERGLOW_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
 }
 
 void loop() {
-  if (underglow_status == 1) {
+  char instruction;
+
+  if (ble.available()) {
+    instruction = ble.read();
+    Serial.print("DATA RECEIVED: ");
+    Serial.println(instruction);
+  }
+  if (Serial.available())
+    ble.write(Serial.read());
+
+  processInstruction(instruction);
+}
+
+void processInstruction(char c) {
+  switch (c) {
+    case UNDERGLOW_OFF:
+      Serial.println("0 - Turn off the underglow");
+      underglow_status = 0;
+      turnOffAll();
+      digitalWrite(UNDERGLOW_DATA_PIN, LOW);
+      break;
+    case UNDERGLOW_ON:
+      Serial.println("1 - Turning ON the underglow");
+      underglow_status = 1;
+      digitalWrite(UNDERGLOW_DATA_PIN, HIGH);
+      showAnimation('b');
+      break;
+    case AMBIENT_OFF:
+      Serial.println("2 - Turn off the ambient light");
+      digitalWrite(AMBIENT_LED_PIN, HIGH);
+      break;
+    case AMBIENT_ON:
+      Serial.println("3 - Turning ON the ambient light");
+      digitalWrite(AMBIENT_LED_PIN, LOW);
+      break;
+    case STROBE_OFF:
+      Serial.println("4 - Turn off the strobe");
+      digitalWrite(STROBE_LED_PIN, LOW);
+      break;
+    case STROBE_ON:
+      Serial.println("5 - Turning ON the strobe");
+      digitalWrite(STROBE_LED_PIN, HIGH);
+      break;
+    default:
+      showAnimation(c);
+      break;
+  }
+}
+
+void showAnimation(char animation) {
+  if (underglow_status==1){
     switch (animation) {
-      case 0:
-        Serial.println("0 - Demo");
+      case 'a':
+        Serial.println("a - Demo");
         rainbow(frame, 169);
         FastLED.show();
         frame += animate_speed;
         break;
-      case 1:
-        Serial.println("1 - Static medium");
+      case 'b':
+        Serial.println("b - Static medium");
         turnMedium();
         break;
-      case 2:
-        Serial.println("2 - Static high");
+      case 'c':
+        Serial.println("c - Static high");
         turnHigh();
         break;
-      case 3:
-        Serial.println("3 - Breathing");
+      case 'd':
+        Serial.println("d - Breathing");
         breath();
         break;
-      case 4:
-        Serial.println("4 - Chase");
+      case 'e':
+        Serial.println("e - Chase");
         chase();
         break;
-      case 5:
-        Serial.println("5 - Random fill");
+      case 'f':
+        Serial.println("f - Random fill");
         randomFill();
         break;
-      case 6:
-        Serial.println("6 - Strobe");
+      case 'g':
+        Serial.println("g - Strobe");
         strobe();
         break;
-      case 7:
-        Serial.println("7 - Alternate strobe");
+      case 'h':
+        Serial.println("h - Alternate strobe");
         alternateStrobe();
         break;
-      case 8:
-        Serial.println("8 - Chase over");
+      case 'i':
+        Serial.println("i - Chase over");
         chaseOver();
         break;
-      case 9:
-        Serial.println("9 - Chase over 2");
+      case 'j':
+        Serial.println("j - Chase over 2");
         chaseOver2();
         break;
-      case 10:
-        Serial.println("10 - Random spark over");
+      case 'k':
+        Serial.println("k - Random spark over");
         randomSparkOver();
         break;
-      case 11:
-        Serial.println("11 - Random spark");
+      case 'l':
+        Serial.println("l - Random spark");
         randomSpark();
         break;
-      case 12:
-        Serial.println("12 - Random spark 2");
+      case 'm':
+        Serial.println("m - Random spark 2");
         randomSpark2();
         FastLED.show();
         frame += animate_speed;
         break;
     }
-  } else {
-    turnOffAll();
   }
 }
 
@@ -245,7 +164,9 @@ void rainbow(uint16_t animationFrame, uint8_t fade) {
 
 void turnMedium() {
   FastLED.clear();
-  lightAllMedium();
+  //lightAllMedium();
+  lightAll(42);
+  delay(500);
   FastLED.show();
 }
 
@@ -253,6 +174,7 @@ void turnHigh() {
   FastLED.clear();
   lightAllHigh();
   FastLED.show();
+  delay(500);
 }
 
 void breath() {
@@ -279,7 +201,7 @@ void chase() {
       if (pos >= 0 && pos < NUM_LEDS)
         lightMedium(pos);
     }
-    uint8_t pos = i-barSize;
+    uint8_t pos = i - barSize;
     if (pos >= 0 && pos < NUM_LEDS)
       turnOff(pos);
     delay(42);
@@ -293,7 +215,7 @@ void randomFill() {
     all[i] = i;
   }
   FastLED.clear();
-  uint8_t total = NUM_LEDS-1;
+  uint8_t total = NUM_LEDS - 1;
   for (uint8_t i = total; i > 0; i--) {
     uint8_t x = random(i);
     uint8_t picked = all[x];
@@ -384,18 +306,17 @@ void turnOnHalf() {
   boolean turnOn = true;
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
     if (turnOn) {
-      lightMedium(i);
+      lightMediumPrep(i);
       count++;
     } else {
-      turnOff(i);
       count--;
     }
     if (count == qty)
       turnOn = false;
     else if (count == 0)
       turnOn = true;
-    FastLED.show();
   }
+  FastLED.show();
 }
 
 void turnOnHalfInverted() {
@@ -404,18 +325,17 @@ void turnOnHalfInverted() {
   boolean turnOn = false;
   for (uint8_t i = 0; i < NUM_LEDS; i++) {
     if (turnOn) {
-      lightMedium(i);
+      lightMediumPrep(i);
       count++;
     } else {
-      turnOff(i);
       count--;
     }
     if (count == qty)
       turnOn = false;
     else if (count == 0)
       turnOn = true;
-  FastLED.show();
   }
+  FastLED.show();
 }
 
 void overUp() {
@@ -485,6 +405,10 @@ void lightMedium(uint8_t pos) {
   Serial.println(pos);
   leds[pos] = CRGB(0, mediumBright, 0);
   FastLED.show();
+}
+
+void lightMediumPrep(uint8_t pos) {
+  leds[pos] = CRGB(0, mediumBright, 0);
 }
 
 void lightHigh(uint8_t pos) {
